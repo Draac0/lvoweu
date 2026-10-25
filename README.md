@@ -16,8 +16,9 @@ Backend (requires [uv](https://docs.astral.sh/uv/)):
 
 ```bash
 cd backend
-uv sync          # creates .venv and installs dependencies
-uv run pytest    # run tests
+uv sync                    # creates .venv and installs dependencies
+uv run python -m app.data  # fetch January data from Elexon into data/cache/
+uv run pytest              # run tests
 uv run ruff check .
 ```
 
