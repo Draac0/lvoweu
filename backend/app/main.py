@@ -1,5 +1,6 @@
-"""HTTP API. The data (~2 MB) is loaded once at startup and kept in memory."""
+"""HTTP API. The data (~2 MB) is loaded once per process and kept in memory."""
 
+import asyncio
 import logging
 import time as clock
 from contextlib import asynccontextmanager
@@ -29,9 +30,24 @@ log = logging.getLogger("app")
 HORIZON_EDGES = [0, 6, 12, 18, 24, 36, 48, 72]
 
 
-def get_data(request: Request) -> Datasets:
-    """The datasets loaded at startup, shared by all requests (see lifespan below)."""
-    return request.app.state.data
+async def _ensure_data(app: FastAPI) -> Datasets:
+    """Load the datasets once per process. Concurrent first requests share the same load."""
+    if app.state.data is None:
+        async with app.state.load_lock:
+            if app.state.data is None:
+                app.state.data = await app.state.loader()
+                log.info(
+                    "Loaded %d actuals, %d forecasts",
+                    len(app.state.data.actuals),
+                    len(app.state.data.forecasts),
+                )
+    return app.state.data
+
+
+async def get_data(request: Request) -> Datasets:
+    """The shared datasets: loaded at startup, or by the first request where a host
+    (e.g. a serverless platform) doesn't run startup hooks."""
+    return await _ensure_data(request.app)
 
 
 Data = Annotated[Datasets, Depends(get_data)]
@@ -140,16 +156,22 @@ def accuracy_by_horizon(data: Data) -> list[HorizonBucket]:
 def create_app(loader=load_datasets) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        # Runs once at startup; every request then reads this via get_data.
-        app.state.data = await loader()
-        log.info(
-            "Loaded %d actuals, %d forecasts",
-            len(app.state.data.actuals),
-            len(app.state.data.forecasts),
-        )
+        await _ensure_data(app)  # load before the first request arrives
         yield
 
-    app = FastAPI(title="Wind Forecast API", version="1.0.0", lifespan=lifespan)
+    app = FastAPI(
+        title="Wind Forecast API",
+        version="1.0.0",
+        lifespan=lifespan,
+        # Under /api, so the docs are reachable wherever only /api/* reaches the backend
+        # (Vercel rewrites, nginx in Docker).
+        docs_url="/api/docs",
+        openapi_url="/api/openapi.json",
+        redoc_url=None,
+    )
+    app.state.loader = loader
+    app.state.data = None
+    app.state.load_lock = asyncio.Lock()
 
     @app.middleware("http")
     async def log_requests(request: Request, call_next):

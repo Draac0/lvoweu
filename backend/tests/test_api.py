@@ -157,3 +157,17 @@ class TestAuth:
             "/api/v1/accuracy/summary", headers={"Authorization": f"Bearer {expired}"}
         )
         assert response.json()["detail"] == "Session expired, please log in again"
+
+
+def test_data_loads_on_first_request_when_startup_hook_does_not_run():
+    # Without `with`, TestClient skips startup, like some serverless hosts.
+    calls = []
+
+    async def counting_loader():
+        calls.append(1)
+        return await fake_loader()
+
+    client = TestClient(create_app(loader=counting_loader))
+    assert client.get("/api/v1/health").json()["actual_rows"] == 2
+    client.get("/api/v1/health")
+    assert len(calls) == 1  # loaded once, then reused

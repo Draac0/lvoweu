@@ -111,7 +111,7 @@ uv run ruff check .
 uv run uvicorn app.main:app --reload   # API on http://localhost:8000
 ```
 
-Interactive API docs: http://localhost:8000/docs
+Interactive API docs: http://localhost:8000/api/docs (also at `/api/docs` in Docker and on the deployed app)
 
 The API contract is committed as [`backend/openapi.json`](backend/openapi.json) and the frontend's TypeScript types are generated from it, so client and server can't drift apart. After changing routes or schemas, run `uv run python -m app.export_openapi`; a test fails if you forget.
 
@@ -133,7 +133,7 @@ All data endpoints require a login. There is one demo user, hard-coded to showca
 - Email: `trader@example.com`
 - Password: `windpower2026`
 
-`POST /api/v1/auth/login` returns a signed token (JWT, valid 8 hours); send it as `Authorization: Bearer <token>`. In `/docs`, use the **Authorize** button. Override `DEMO_EMAIL`, `DEMO_PASSWORD` and `JWT_SECRET` via environment variables in any real deployment.
+`POST /api/v1/auth/login` returns a signed token (JWT, valid 8 hours); send it as `Authorization: Bearer <token>`. In `/api/docs`, use the **Authorize** button. Override `DEMO_EMAIL`, `DEMO_PASSWORD` and `JWT_SECRET` via environment variables in any real deployment.
 
 | Endpoint | Returns |
 |---|---|
@@ -151,4 +151,14 @@ All times in the API are UTC. Delivery days and the `cutoff` are in **GB market 
 
 `cutoff` is market local time on the day before delivery (the auction deadline); the decision forecast for each hour is the latest one published at or before it. The server does all filtering and aggregation; responses contain only what the UI displays.
 
-_More sections (frontend, Docker, deployment, assumptions, AI usage) are added as the project is built._
+## Deployment (Vercel)
+
+Live app: _link added after the first deploy_
+
+One Vercel project, two [Vercel Services](https://vercel.com/templates/react/vite-fastapi-starter) defined in [`vercel.json`](vercel.json): `frontend` (Vite build, served statically) and `backend` (FastAPI, `app.main:app`, dependencies from `backend/pyproject.toml` + `uv.lock`). Rewrites send `/api/*` to the backend and everything else to the frontend, so both share one domain: no CORS and no API-URL environment variable, the same shape as the Vite dev proxy and the nginx container.
+
+The backend runs as a serverless function. On a cold start the first request loads January's data from Elexon (about 2 s) into `/tmp`; later requests on a warm instance reuse it.
+
+To deploy: import the GitHub repo in Vercel (or run `vercel deploy` from the repo root) and set a `JWT_SECRET` environment variable for the project.
+
+_More sections (assumptions, AI usage) are added as the project is built._

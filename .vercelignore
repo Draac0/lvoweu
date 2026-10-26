@@ -1,0 +1,5 @@
+# Local build artefacts and caches; Vercel installs and builds from source.
+**/node_modules
+**/.venv
+frontend/dist
+backend/data
