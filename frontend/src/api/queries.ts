@@ -43,6 +43,24 @@ export function useForecastHistory(startTime: string | undefined) {
   })
 }
 
+/** Typical miss by how far ahead forecasts were made (all forecasts, not cutoff-specific). */
+export function useHorizonAccuracy() {
+  return useQuery({
+    queryKey: ['by-horizon'],
+    queryFn: () => unwrap(api.GET('/api/v1/accuracy/by-horizon')),
+  })
+}
+
+/** Error histogram plus the share of hours still short for each safety margin. */
+export function useDistribution(cutoff: string) {
+  return useQuery({
+    queryKey: ['distribution', cutoff],
+    queryFn: () =>
+      unwrap(api.GET('/api/v1/accuracy/distribution', { params: { query: { cutoff } } })),
+    placeholderData: keepPreviousData,
+  })
+}
+
 export function useLogin() {
   return useMutation({
     mutationFn: (credentials: { email: string; password: string }) =>

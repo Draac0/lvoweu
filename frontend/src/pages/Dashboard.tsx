@@ -1,5 +1,6 @@
 import { useSummary } from '@/api/queries'
 import { DaySection } from '@/components/DaySection'
+import { TrustSection } from '@/components/TrustSection'
 import { SummaryTiles, SummaryTilesSkeleton } from '@/components/SummaryTiles'
 import { Button } from '@/components/ui/button'
 import {
@@ -65,6 +66,7 @@ export function Dashboard({ onLogout }: { onLogout: () => void }) {
         </section>
 
         <DaySection cutoff={cutoff} />
+        <TrustSection cutoff={cutoff} />
       </main>
     </div>
   )
