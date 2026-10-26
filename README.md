@@ -2,6 +2,8 @@
 
 Shows UK national wind generation forecasts as they stood at day-ahead decision time, and measures how accurate they were, for deliveries in January 2026. Data source: Elexon BMRS (`FUELHH` actuals, `WINDFOR` forecasts).
 
+**Live app: https://wind-forecast-beta.vercel.app/** — demo login `trader@example.com` / `windpower2026`
+
 ## Repository layout
 
 | Path | Contents |
@@ -153,7 +155,7 @@ All times in the API are UTC. Delivery days and the `cutoff` are in **GB market 
 
 ## Deployment (Vercel)
 
-Live app: _link added after the first deploy_
+**Live app: https://wind-forecast-beta.vercel.app/** (demo login `trader@example.com` / `windpower2026`; API docs at [/api/docs](https://wind-forecast-beta.vercel.app/api/docs))
 
 One Vercel project, two [Vercel Services](https://vercel.com/templates/react/vite-fastapi-starter) defined in [`vercel.json`](vercel.json): `frontend` (Vite build, served statically) and `backend` (FastAPI, `app.main:app`, dependencies from `backend/pyproject.toml` + `uv.lock`). Rewrites send `/api/*` to the backend and everything else to the frontend, so both share one domain: no CORS and no API-URL environment variable, the same shape as the Vite dev proxy and the nginx container.
 
