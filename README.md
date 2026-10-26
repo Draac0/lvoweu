@@ -161,4 +161,18 @@ The backend runs as a serverless function. On a cold start the first request loa
 
 To deploy: import the GitHub repo in Vercel (or run `vercel deploy` from the repo root) and set a `JWT_SECRET` environment variable for the project.
 
-_More sections (assumptions, AI usage) are added as the project is built._
+## Assumptions and decisions
+
+- **Scope**: national (GB) wind only, from Elexon `FUELHH` (`fuelType=WIND`) and `WINDFOR`, for deliveries in January 2026. Customer demand is out of scope, so the app quantifies the wind side of "power to buy = demand − wind", not the purchase volume itself.
+- **Decision time**: the GB day-ahead auctions close around 09:20–09:50 UK time on the day before delivery, so the default cutoff is **09:00 UK time on D-1**. It is a parameter (`?cutoff=`), selectable in the UI.
+- **Decision forecast**: for each hour, the latest forecast published at or before the cutoff. If it is more than 4 hours older than the cutoff (Elexon publishes at most 4 hours apart), a publish was missed and it is flagged `stale`.
+- **Matching**: forecasts are hourly and actuals half-hourly, so they are compared at the on-the-hour actual. Forecast rows about the past (publish time at or after the target time) are not forecasts and are dropped.
+- **Error sign**: error = forecast − actual. Positive means the forecast promised more wind than arrived, so a buyer relying on it is short.
+- **Time zones**: the API speaks UTC; delivery days and the cutoff are GB market time (UK local, GMT/BST).
+- **Data freshness**: January 2026 is history, so data is fetched from Elexon once and cached; it is not refreshed.
+- **Findings, not causes**: forecasts ran about 1.9 GW high in January. Likely contributors (curtailment of wind farms on congested days, differences in which farms each dataset covers) are hypotheses, not verified with these two datasets alone.
+- **Login** is a single hard-coded demo user to show the flow; a real deployment would use proper user management or SSO.
+
+## AI usage
+
+This project was built with **Claude Code** (Anthropic) as an AI pair programmer: exploring the Elexon APIs and data, scaffolding, writing code and tests, and reviewing changes. I directed the design decisions, reviewed every change before committing it, and ran and tested the app myself.
