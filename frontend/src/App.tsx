@@ -1,8 +1,11 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { setUnauthorizedHandler, tokenStore } from '@/api/client'
-import { Dashboard } from '@/pages/Dashboard'
+import { Spinner } from '@/components/ui/spinner'
 import { LoginPage } from '@/pages/LoginPage'
+
+// Loaded only after login: keeps the charting library out of the first page's download.
+const Dashboard = lazy(() => import('@/pages/Dashboard').then((m) => ({ default: m.Dashboard })))
 
 export default function App() {
   const queryClient = useQueryClient()
@@ -27,5 +30,17 @@ export default function App() {
     setLoggedIn(false)
   }
 
-  return loggedIn ? <Dashboard onLogout={logout} /> : <LoginPage onLogin={login} notice={notice} />
+  if (!loggedIn) return <LoginPage onLogin={login} notice={notice} />
+
+  return (
+    <Suspense
+      fallback={
+        <div className="grid min-h-screen place-items-center">
+          <Spinner className="size-6 text-muted-foreground" />
+        </div>
+      }
+    >
+      <Dashboard onLogout={logout} />
+    </Suspense>
+  )
 }
