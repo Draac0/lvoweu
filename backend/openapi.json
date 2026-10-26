@@ -1,0 +1,608 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Wind Forecast API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login",
+        "operationId": "login_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Token"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/actuals": {
+      "get": {
+        "summary": "Actuals",
+        "description": "Half-hourly actual wind generation, optionally limited to start <= start_time < end.",
+        "operationId": "actuals_api_v1_actuals_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ActualPoint"
+                  },
+                  "title": "Response Actuals Api V1 Actuals Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/decision-forecasts": {
+      "get": {
+        "summary": "Decision Forecasts",
+        "description": "For every hour, the forecast available at the cutoff, its actual, and the error.",
+        "operationId": "decision_forecasts_api_v1_decision_forecasts_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cutoff",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "time",
+              "description": "UK local time on the day before delivery (auction deadline)",
+              "default": "09:00:00",
+              "title": "Cutoff"
+            },
+            "description": "UK local time on the day before delivery (auction deadline)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionForecasts"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/forecasts": {
+      "get": {
+        "summary": "Forecast History",
+        "description": "Every forecast ever published for one target hour, oldest first.",
+        "operationId": "forecast_history_api_v1_forecasts_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "start_time",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "title": "Start Time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForecastHistory"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accuracy/by-horizon": {
+      "get": {
+        "summary": "Accuracy By Horizon",
+        "description": "Mean absolute error of all forecasts, grouped by how far ahead they were made.",
+        "operationId": "accuracy_by_horizon_api_v1_accuracy_by_horizon_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/HorizonBucket"
+                  },
+                  "type": "array",
+                  "title": "Response Accuracy By Horizon Api V1 Accuracy By Horizon Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ActualPoint": {
+        "properties": {
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time"
+          },
+          "generation_mw": {
+            "type": "number",
+            "title": "Generation Mw"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_time",
+          "generation_mw"
+        ],
+        "title": "ActualPoint"
+      },
+      "DecisionForecasts": {
+        "properties": {
+          "cutoff": {
+            "type": "string",
+            "format": "time",
+            "title": "Cutoff"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ErrorSummary"
+          },
+          "hours": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionHour"
+            },
+            "type": "array",
+            "title": "Hours"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cutoff",
+          "summary",
+          "hours"
+        ],
+        "title": "DecisionForecasts"
+      },
+      "DecisionHour": {
+        "properties": {
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time"
+          },
+          "publish_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Publish Time"
+          },
+          "horizon_h": {
+            "type": "number",
+            "title": "Horizon H"
+          },
+          "forecast_mw": {
+            "type": "number",
+            "title": "Forecast Mw"
+          },
+          "actual_mw": {
+            "type": "number",
+            "title": "Actual Mw"
+          },
+          "error_mw": {
+            "type": "number",
+            "title": "Error Mw"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_time",
+          "publish_time",
+          "horizon_h",
+          "forecast_mw",
+          "actual_mw",
+          "error_mw",
+          "stale"
+        ],
+        "title": "DecisionHour"
+      },
+      "ErrorSummary": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "mae": {
+            "type": "number",
+            "title": "Mae"
+          },
+          "bias": {
+            "type": "number",
+            "title": "Bias"
+          },
+          "p10": {
+            "type": "number",
+            "title": "P10"
+          },
+          "p50": {
+            "type": "number",
+            "title": "P50"
+          },
+          "p90": {
+            "type": "number",
+            "title": "P90"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count",
+          "mae",
+          "bias",
+          "p10",
+          "p50",
+          "p90"
+        ],
+        "title": "ErrorSummary",
+        "description": "Error = forecast - actual. 80% of errors fall between p10 and p90."
+      },
+      "ForecastHistory": {
+        "properties": {
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time"
+          },
+          "actual_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Mw"
+          },
+          "forecasts": {
+            "items": {
+              "$ref": "#/components/schemas/ForecastPoint"
+            },
+            "type": "array",
+            "title": "Forecasts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_time",
+          "actual_mw",
+          "forecasts"
+        ],
+        "title": "ForecastHistory"
+      },
+      "ForecastPoint": {
+        "properties": {
+          "publish_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Publish Time"
+          },
+          "horizon_h": {
+            "type": "number",
+            "title": "Horizon H"
+          },
+          "forecast_mw": {
+            "type": "number",
+            "title": "Forecast Mw"
+          }
+        },
+        "type": "object",
+        "required": [
+          "publish_time",
+          "horizon_h",
+          "forecast_mw"
+        ],
+        "title": "ForecastPoint"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "Health": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "actual_rows": {
+            "type": "integer",
+            "title": "Actual Rows"
+          },
+          "forecast_rows": {
+            "type": "integer",
+            "title": "Forecast Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "actual_rows",
+          "forecast_rows"
+        ],
+        "title": "Health"
+      },
+      "HorizonBucket": {
+        "properties": {
+          "from_h": {
+            "type": "number",
+            "title": "From H"
+          },
+          "to_h": {
+            "type": "number",
+            "title": "To H"
+          },
+          "mae": {
+            "type": "number",
+            "title": "Mae"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "from_h",
+          "to_h",
+          "mae",
+          "count"
+        ],
+        "title": "HorizonBucket"
+      },
+      "LoginRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequest"
+      },
+      "Token": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "expires_at"
+        ],
+        "title": "Token"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}
