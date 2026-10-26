@@ -1,7 +1,6 @@
 from datetime import time
 
 import pandas as pd
-import pytest
 
 from app.analysis import decision_forecasts, mae_by_horizon, summarize, with_actuals
 
@@ -71,8 +70,8 @@ def test_error_is_forecast_minus_actual_on_the_hour():
 def test_summarize():
     stats = summarize(pd.Series([100.0, -100.0, 300.0]))
     assert stats["count"] == 3
-    assert stats["mae"] == pytest.approx(500 / 3)
-    assert stats["bias"] == pytest.approx(100)
+    assert stats["mae"] == 166.7  # 500 / 3, rounded
+    assert stats["bias"] == 100
 
 
 def test_percentiles_bracket_80_percent_of_errors():

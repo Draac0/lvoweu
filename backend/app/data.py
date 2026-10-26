@@ -7,6 +7,7 @@ import asyncio
 import json
 import logging
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
@@ -43,8 +44,15 @@ async def load_raw(
     return rows
 
 
-async def load_datasets(cache_dir: Path = CACHE_DIR) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Return (actuals, forecasts) as cleaned DataFrames."""
+@dataclass(frozen=True)
+class Datasets:
+    """Cleaned data, loaded once and shared read-only by every request."""
+
+    actuals: pd.DataFrame
+    forecasts: pd.DataFrame
+
+
+async def load_datasets(cache_dir: Path = CACHE_DIR) -> Datasets:
     async with elexon.make_client() as client:
         actual_rows, forecast_rows = await asyncio.gather(
             load_raw(
@@ -58,12 +66,13 @@ async def load_datasets(cache_dir: Path = CACHE_DIR) -> tuple[pd.DataFrame, pd.D
                 cache_dir,
             ),
         )
-    return clean_actuals(actual_rows), clean_forecasts(forecast_rows)
+    return Datasets(actuals=clean_actuals(actual_rows), forecasts=clean_forecasts(forecast_rows))
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    actuals, forecasts = asyncio.run(load_datasets())
+    data = asyncio.run(load_datasets())
+    actuals, forecasts = data.actuals, data.forecasts
     print(
         f"actuals:   {len(actuals)} rows, {actuals.start_time.min()} .. {actuals.start_time.max()}"
     )

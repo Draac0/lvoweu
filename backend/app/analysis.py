@@ -46,15 +46,15 @@ def with_actuals(forecasts: pd.DataFrame, actuals: pd.DataFrame) -> pd.DataFrame
 
 
 def summarize(errors: pd.Series) -> dict[str, float]:
-    """Headline accuracy numbers, all in MW."""
+    """Headline accuracy numbers, all in MW, rounded to 0.1 MW."""
     p10, p50, p90 = np.percentile(errors, [10, 50, 90])
     return {
         "count": int(errors.size),
-        "mae": float(errors.abs().mean()),
-        "bias": float(errors.mean()),
-        "p10": float(p10),
-        "p50": float(p50),
-        "p90": float(p90),
+        "mae": round(float(errors.abs().mean()), 1),
+        "bias": round(float(errors.mean()), 1),
+        "p10": round(float(p10), 1),
+        "p50": round(float(p50), 1),
+        "p90": round(float(p90), 1),
     }
 
 
