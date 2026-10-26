@@ -14,7 +14,9 @@ Shows UK national wind generation forecasts as they stood at day-ahead decision 
 | `frontend/src/api/` | Typed API client; `schema.d.ts` is generated from `openapi.json` |
 | `frontend/src/pages/` | Login and dashboard screens |
 | `frontend/src/components/` | UI pieces (summary tiles, charts) |
-| `frontend/src/lib/` | Formatting and URL-state helpers |
+| `frontend/src/lib/` | Formatting, time-zone and URL-state helpers |
+| `docker-compose.yml`, `*/Dockerfile` | Containers: FastAPI (uvicorn) and the built frontend behind nginx |
+| `.github/workflows/ci.yml` | CI: lint, format, tests, type check, build, generated-types check, Docker build |
 
 ## Data source: Elexon BMRS
 
@@ -87,6 +89,16 @@ How the data is shaped:
 January 2026 analysis window: 280 publishes, 20,440 rows fetched, 16,239 kept after dropping past rows.
 
 ## Running locally
+
+### With Docker (simplest)
+
+```bash
+docker compose up --build
+```
+
+Open http://localhost:8080. The first start fetches January's data from Elexon (a few seconds); it is cached in a Docker volume after that. nginx serves the built frontend and forwards `/api` to the backend container.
+
+### Without Docker
 
 Backend (requires [uv](https://docs.astral.sh/uv/)):
 

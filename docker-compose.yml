@@ -1,0 +1,26 @@
+# docker compose up --build   ->   http://localhost:8080
+services:
+  backend:
+    build: ./backend
+    volumes:
+      # Keep the Elexon cache between restarts, so data is fetched only once.
+      - elexon-cache:/app/data/cache
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')
+      interval: 5s
+      start_period: 60s # first start fetches January's data from Elexon
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  elexon-cache:
