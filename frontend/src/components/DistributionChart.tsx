@@ -1,5 +1,13 @@
 import { useState } from 'react'
-import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from 'recharts'
+import {
+  Bar,
+  BarChart,
+  type BarShapeProps,
+  CartesianGrid,
+  Rectangle,
+  XAxis,
+  YAxis,
+} from 'recharts'
 import type { ErrorDistribution } from '@/api/types'
 import {
   type ChartConfig,
@@ -14,24 +22,29 @@ const config = {
   count: { label: 'Hours' },
 } satisfies ChartConfig
 
+/** Orange when the forecast missed by more than the margin, so you'd still be short. */
+function MissBar(props: BarShapeProps) {
+  const fill = props.payload.stillShort ? 'var(--buy)' : 'var(--muted-foreground)'
+  return <Rectangle {...props} fill={fill} />
+}
+
 /** Chart D: how big the misses were, and how much safety margin covers them. */
 export function DistributionChart({ distribution }: { distribution: ErrorDistribution }) {
   const { bins, shortfall } = distribution
   const [margin, setMargin] = useState(0)
   // The server sends the share short for every margin step, so the slider is a lookup.
   const step = shortfall[1].margin_mw - shortfall[0].margin_mw
-  const point = shortfall.find((p) => p.margin_mw === margin) ?? shortfall[0]
+  const atMargin = shortfall.find((p) => p.margin_mw === margin) ?? shortfall[0]
 
   // Round tick steps of 50 hours, so the axis reads 0, 50, 100, ...
-  const top = Math.ceil(Math.max(...bins.map((b) => b.count)) / 50) * 50
-  const yTicks = Array.from({ length: top / 50 + 1 }, (_, i) => i * 50)
+  const yMax = Math.ceil(Math.max(...bins.map((b) => b.count)) / 50) * 50
+  const yTicks = Array.from({ length: yMax / 50 + 1 }, (_, i) => i * 50)
 
   const rows = bins.map((b) => ({
     label: `${b.from_mw > 0 ? '+' : ''}${b.from_mw / 1000}`,
     range: `${gw(b.from_mw)} to ${gw(b.to_mw)}`,
     count: b.count,
-    // Hours whose miss exceeds the margin are hours you'd still be short.
-    short: b.from_mw >= margin,
+    stillShort: b.from_mw >= margin,
   }))
 
   return (
@@ -44,7 +57,7 @@ export function DistributionChart({ distribution }: { distribution: ErrorDistrib
             width={40}
             tickLine={false}
             axisLine={false}
-            domain={[0, top]}
+            domain={[0, yMax]}
             ticks={yTicks}
           />
           <ChartTooltip
@@ -55,11 +68,7 @@ export function DistributionChart({ distribution }: { distribution: ErrorDistrib
               />
             }
           />
-          <Bar dataKey="count" radius={3}>
-            {rows.map((row) => (
-              <Cell key={row.label} fill={row.short ? 'var(--buy)' : 'var(--muted-foreground)'} />
-            ))}
-          </Bar>
+          <Bar dataKey="count" radius={3} shape={MissBar} />
         </BarChart>
       </ChartContainer>
       <p className="-mt-2 text-center text-xs text-muted-foreground">
@@ -73,7 +82,7 @@ export function DistributionChart({ distribution }: { distribution: ErrorDistrib
           </label>
           <span>
             Still short in{' '}
-            <b className="text-base text-buy tabular-nums">{percent(point.share_short)}</b> of
+            <b className="text-base text-buy tabular-nums">{percent(atMargin.share_short)}</b> of
             hours
           </span>
         </div>

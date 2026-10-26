@@ -26,11 +26,9 @@ def market_day_bounds(day: date) -> tuple[pd.Timestamp, pd.Timestamp]:
 
 def decision_cutoff(start_time: pd.Series, cutoff: time) -> pd.Series:
     """Cutoff (UTC) for each target hour: `cutoff` market local time on the day before delivery."""
-    delivery_day = market_day(start_time)
-    local = (
-        delivery_day - pd.Timedelta(days=1) + pd.Timedelta(hours=cutoff.hour, minutes=cutoff.minute)
-    )
-    return local.dt.tz_localize(MARKET_TIMEZONE).dt.tz_convert("UTC")
+    day_before = market_day(start_time) - pd.Timedelta(days=1)
+    cutoff_local = day_before + pd.Timedelta(hours=cutoff.hour, minutes=cutoff.minute)
+    return cutoff_local.dt.tz_localize(MARKET_TIMEZONE).dt.tz_convert("UTC")
 
 
 def decision_forecasts(forecasts: pd.DataFrame, cutoff: time = time(9, 0)) -> pd.DataFrame:
@@ -40,11 +38,14 @@ def decision_forecasts(forecasts: pd.DataFrame, cutoff: time = time(9, 0)) -> pd
     Target hours with no forecast before the cutoff are left out.
     """
     df = forecasts.assign(cutoff=decision_cutoff(forecasts["start_time"], cutoff))
-    df = df[df["publish_time"] <= df["cutoff"]]
-    df = df.sort_values("publish_time").groupby("start_time").tail(1)
-    age_h = (df["cutoff"] - df["publish_time"]).dt.total_seconds() / 3600
-    df = df.assign(stale=age_h > STALE_AFTER_H).drop(columns="cutoff")
-    return df.sort_values("start_time").reset_index(drop=True)
+    published_in_time = df[df["publish_time"] <= df["cutoff"]]
+    latest_per_hour = published_in_time.sort_values("publish_time").groupby("start_time").tail(1)
+
+    hours_old = (
+        latest_per_hour["cutoff"] - latest_per_hour["publish_time"]
+    ).dt.total_seconds() / 3600
+    chosen = latest_per_hour.assign(stale=hours_old > STALE_AFTER_H).drop(columns="cutoff")
+    return chosen.sort_values("start_time").reset_index(drop=True)
 
 
 def with_actuals(forecasts: pd.DataFrame, actuals: pd.DataFrame) -> pd.DataFrame:
@@ -55,7 +56,7 @@ def with_actuals(forecasts: pd.DataFrame, actuals: pd.DataFrame) -> pd.DataFrame
     """
     actual = actuals.rename(columns={"generation_mw": "actual_mw"})
     df = forecasts.merge(actual, on="start_time", how="inner")
-    return df.assign(error_mw=df["generation_mw"] - df["actual_mw"])
+    return df.assign(error_mw=df["forecast_mw"] - df["actual_mw"])
 
 
 def summarize(errors: pd.Series) -> dict[str, float]:
@@ -90,9 +91,10 @@ def mae_by_day(matched: pd.DataFrame) -> pd.DataFrame:
 
 def error_histogram(errors: pd.Series, width_mw: float = 1000) -> pd.DataFrame:
     """Count of errors per `width_mw` bucket: columns from_mw, to_mw, count."""
-    low = np.floor(errors.min() / width_mw) * width_mw
-    high = (np.floor(errors.max() / width_mw) + 1) * width_mw
-    counts, edges = np.histogram(errors, bins=np.arange(low, high + width_mw / 2, width_mw))
+    first_edge = np.floor(errors.min() / width_mw) * width_mw
+    last_edge = np.floor(errors.max() / width_mw) * width_mw + width_mw
+    edges = np.arange(first_edge, last_edge + width_mw, width_mw)
+    counts, _ = np.histogram(errors, bins=edges)
     return pd.DataFrame({"from_mw": edges[:-1], "to_mw": edges[1:], "count": counts})
 
 
@@ -102,8 +104,8 @@ def shortfall_curve(errors: pd.Series, step_mw: float = 100) -> pd.DataFrame:
     Planning for `margin` MW less wind than forecast leaves you short whenever the
     forecast was too high by more than that (error > margin).
     """
-    top = max(errors.max(), 0)
-    margins = np.arange(0, top + step_mw, step_mw)
-    values = errors.to_numpy()
-    shares = [(values > m).mean() for m in margins]
-    return pd.DataFrame({"margin_mw": margins, "share_short": np.round(shares, 4)})
+    largest_miss = max(errors.max(), 0)
+    margins = np.arange(0, largest_miss + step_mw, step_mw)
+    misses = errors.to_numpy()
+    share_short = [(misses > margin).mean() for margin in margins]
+    return pd.DataFrame({"margin_mw": margins, "share_short": np.round(share_short, 4)})

@@ -33,7 +33,7 @@ export function ForecastHistoryChart({ history, decisionPublishTime }: Props) {
     forecast: f.forecast_mw / 1000,
     publishTime: f.publish_time,
   }))
-  const decision = rows.find((r) => r.publishTime === decisionPublishTime)
+  const usedAtAuction = rows.find((r) => r.publishTime === decisionPublishTime)
   const actual = history.actual_mw === null ? undefined : history.actual_mw / 1000
   // Scale to fit the forecasts AND the actual, or the actual line can fall off the chart.
   const values = rows.map((r) => r.forecast).concat(actual ?? [])
@@ -88,9 +88,9 @@ export function ForecastHistoryChart({ history, decisionPublishTime }: Props) {
             }}
           />
         )}
-        {decision && (
+        {usedAtAuction && (
           <ReferenceLine
-            x={decision.horizon}
+            x={usedAtAuction.horizon}
             stroke="var(--buy)"
             strokeDasharray="4 4"
             label={{ value: 'Used at auction', position: 'insideTopRight', fill: 'var(--buy)' }}

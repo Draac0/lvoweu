@@ -25,7 +25,7 @@ from app.config import (
 log = logging.getLogger(__name__)
 
 
-async def load_raw(
+async def load_cached(
     name: str, fetch: Callable[[], Awaitable[list[dict]]], cache_dir: Path
 ) -> list[dict]:
     path = cache_dir / f"{name}.json"
@@ -55,12 +55,12 @@ class Datasets:
 async def load_datasets(cache_dir: Path = CACHE_DIR) -> Datasets:
     async with elexon.make_client() as client:
         actual_rows, forecast_rows = await asyncio.gather(
-            load_raw(
+            load_cached(
                 "actuals",
                 lambda: elexon.fetch_actuals(client, DELIVERY_START, DELIVERY_END),
                 cache_dir,
             ),
-            load_raw(
+            load_cached(
                 "forecasts",
                 lambda: elexon.fetch_forecasts(client, FORECAST_PUBLISH_FROM, FORECAST_PUBLISH_TO),
                 cache_dir,

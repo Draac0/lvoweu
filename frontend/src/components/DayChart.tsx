@@ -30,18 +30,18 @@ export function DayChart({ hours, actuals, selectedTime, onSelectTime }: Props) 
   // Actuals are half-hourly, forecasts hourly: merge them onto one time axis.
   const rows = useMemo(() => {
     const byTime = new Map<number, Row>()
-    const row = (iso: string) => {
+    const rowAt = (iso: string) => {
       const t = Date.parse(iso)
       if (!byTime.has(t)) byTime.set(t, { t })
       return byTime.get(t)!
     }
-    for (const a of actuals) row(a.start_time).actual = a.generation_mw / 1000
-    for (const h of hours) row(h.start_time).forecast = h.forecast_mw / 1000
+    for (const a of actuals) rowAt(a.start_time).actual = a.generation_mw / 1000
+    for (const h of hours) rowAt(h.start_time).forecast = h.forecast_mw / 1000
     return [...byTime.values()].sort((a, b) => a.t - b.t)
   }, [hours, actuals])
 
   // Clicking anywhere on the chart selects the forecast hour at or before that point.
-  function select(t: number) {
+  function selectHourAt(t: number) {
     const hour = [...hours].reverse().find((h) => Date.parse(h.start_time) <= t)
     if (hour) onSelectTime(hour.start_time)
   }
@@ -52,7 +52,7 @@ export function DayChart({ hours, actuals, selectedTime, onSelectTime }: Props) 
         data={rows}
         margin={{ left: 4, right: 12, top: 8 }}
         onClick={(state) => {
-          if (typeof state.activeLabel === 'number') select(state.activeLabel)
+          if (typeof state.activeLabel === 'number') selectHourAt(state.activeLabel)
         }}
         className="cursor-pointer"
       >

@@ -19,8 +19,8 @@ def ts(s):
 
 
 def forecasts(*rows):
-    """rows of (publish_time, start_time, generation_mw)."""
-    df = pd.DataFrame(rows, columns=["publish_time", "start_time", "generation_mw"])
+    """rows of (publish_time, start_time, forecast_mw)."""
+    df = pd.DataFrame(rows, columns=["publish_time", "start_time", "forecast_mw"])
     df["publish_time"] = pd.to_datetime(df["publish_time"], utc=True)
     df["start_time"] = pd.to_datetime(df["start_time"], utc=True)
     df["horizon_h"] = (df["start_time"] - df["publish_time"]).dt.total_seconds() / 3600
@@ -39,7 +39,7 @@ class TestDecisionForecasts:
     def test_picks_latest_forecast_before_auction(self):
         row = decision_forecasts(DAY_BEFORE_BATCHES).iloc[0]
         assert row["publish_time"] == ts("2026-01-14T07:30:00Z")
-        assert row["generation_mw"] == 8962
+        assert row["forecast_mw"] == 8962
         assert not row["stale"]
 
     def test_later_cutoff_picks_later_forecast(self):

@@ -70,4 +70,4 @@ class TestCleanForecasts:
     def test_empty_input_gives_empty_frame_with_columns(self):
         df = clean_forecasts([])
         assert df.empty
-        assert list(df.columns) == ["publish_time", "start_time", "horizon_h", "generation_mw"]
+        assert list(df.columns) == ["publish_time", "start_time", "horizon_h", "forecast_mw"]

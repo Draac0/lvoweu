@@ -22,7 +22,7 @@ def clean_actuals(rows: list[dict]) -> pd.DataFrame:
 
 
 def clean_forecasts(rows: list[dict]) -> pd.DataFrame:
-    """Hourly wind forecasts with columns publish_time, start_time, horizon_h, generation_mw.
+    """Hourly wind forecasts with columns publish_time, start_time, horizon_h, forecast_mw.
 
     Each publish also restates ~25 hours of the past; those rows (horizon <= 0) are
     not forecasts and are dropped.
@@ -32,13 +32,13 @@ def clean_forecasts(rows: list[dict]) -> pd.DataFrame:
         {
             "publish_time": pd.to_datetime(raw["publishTime"], utc=True),
             "start_time": pd.to_datetime(raw["startTime"], utc=True),
-            "generation_mw": pd.to_numeric(raw["generation"]),
+            "forecast_mw": pd.to_numeric(raw["generation"]),
         }
-    ).dropna(subset=["generation_mw"])
+    ).dropna(subset=["forecast_mw"])
     df["horizon_h"] = (df["start_time"] - df["publish_time"]).dt.total_seconds() / 3600
     df = df[df["horizon_h"] > 0]
     # Unlike actuals, a repeat within one publish has no newer version to prefer, so
     # row order doesn't matter here.
     df = df.drop_duplicates(["publish_time", "start_time"], keep="last")
-    columns = ["publish_time", "start_time", "horizon_h", "generation_mw"]
+    columns = ["publish_time", "start_time", "horizon_h", "forecast_mw"]
     return df[columns].sort_values(["publish_time", "start_time"]).reset_index(drop=True)
