@@ -1,11 +1,11 @@
-import type { Schemas } from '@/api/client'
+import type { ErrorSummary } from '@/api/types'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { gw, signedGw } from '@/lib/format'
 
 const gridClass = 'grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3'
 
-export function SummaryTiles({ summary }: { summary: Schemas['ErrorSummary'] }) {
+export function SummaryTiles({ summary }: { summary: ErrorSummary }) {
   const tiles = [
     { label: 'Typical miss (MAE)', value: gw(summary.mae) },
     { label: 'Bias (+ means forecast too high)', value: signedGw(summary.bias) },

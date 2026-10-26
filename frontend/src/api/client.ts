@@ -1,8 +1,5 @@
 import createClient, { type Middleware } from 'openapi-fetch'
-import type { components, paths } from '@/api/schema'
-
-// Types come from the backend's OpenAPI spec (npm run gen:api), never written by hand.
-export type Schemas = components['schemas']
+import type { paths } from '@/api/schema'
 
 const TOKEN_KEY = 'wind-forecast-token'
 

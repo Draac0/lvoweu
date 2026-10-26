@@ -1,4 +1,5 @@
-import { useDecisionForecasts } from '@/api/queries'
+import { useSummary } from '@/api/queries'
+import { DaySection } from '@/components/DaySection'
 import { SummaryTiles, SummaryTilesSkeleton } from '@/components/SummaryTiles'
 import { Button } from '@/components/ui/button'
 import {
@@ -17,7 +18,7 @@ const CUTOFFS = ['06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00']
 
 export function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [cutoff, setCutoff] = useUrlParam('cutoff', '09:00')
-  const decision = useDecisionForecasts(cutoff)
+  const summary = useSummary(cutoff)
 
   return (
     <div className="min-h-screen">
@@ -51,17 +52,19 @@ export function Dashboard({ onLogout }: { onLogout: () => void }) {
             <h2 className="text-lg font-semibold">
               January 2026: how accurate was the forecast you could act on?
             </h2>
-            {decision.isPlaceholderData && <Spinner className="text-muted-foreground" />}
+            {summary.isPlaceholderData && <Spinner className="text-muted-foreground" />}
           </div>
-          {decision.isPending && <SummaryTilesSkeleton />}
-          {decision.isError && <p className="text-destructive">{decision.error.message}</p>}
-          {decision.data && (
+          {summary.isPending && <SummaryTilesSkeleton />}
+          {summary.isError && <p className="text-destructive">{summary.error.message}</p>}
+          {summary.data && (
             // Dim the previous cutoff's numbers while the new ones load.
-            <div className={cn('transition-opacity', decision.isPlaceholderData && 'opacity-50')}>
-              <SummaryTiles summary={decision.data.summary} />
+            <div className={cn('transition-opacity', summary.isPlaceholderData && 'opacity-50')}>
+              <SummaryTiles summary={summary.data} />
             </div>
           )}
         </section>
+
+        <DaySection cutoff={cutoff} />
       </main>
     </div>
   )

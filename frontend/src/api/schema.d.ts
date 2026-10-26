@@ -58,7 +58,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/decision-forecasts": {
+    "/api/v1/accuracy/summary": {
         parameters: {
             query?: never;
             header?: never;
@@ -66,10 +66,70 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Decision Forecasts
-         * @description For every hour, the forecast available at the cutoff, its actual, and the error.
+         * Accuracy Summary
+         * @description Headline accuracy of the forecasts available at the cutoff, over all hours.
          */
-        get: operations["decision_forecasts_api_v1_decision_forecasts_get"];
+        get: operations["accuracy_summary_api_v1_accuracy_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accuracy/distribution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Accuracy Distribution
+         * @description Histogram of errors, and the share of hours still short for each safety margin.
+         */
+        get: operations["accuracy_distribution_api_v1_accuracy_distribution_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/days": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Days
+         * @description Every delivery day with its typical miss (mean absolute error).
+         */
+        get: operations["days_api_v1_days_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/days/{day}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Day Detail
+         * @description One market (UK) day: each hour's forecast at the cutoff vs actual, and all actuals.
+         */
+        get: operations["day_detail_api_v1_days__day__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -132,18 +192,37 @@ export interface components {
             /** Generation Mw */
             generation_mw: number;
         };
-        /** DecisionForecasts */
-        DecisionForecasts: {
+        /**
+         * DayDetail
+         * @description One market (UK) delivery day: hourly forecasts vs actuals, plus half-hourly actuals.
+         */
+        DayDetail: {
             /**
-             * Cutoff
-             * Format: time
+             * Date
+             * Format: date
              */
-            cutoff: string;
-            summary: components["schemas"]["ErrorSummary"];
+            date: string;
+            /** Mae */
+            mae: number;
             /** Hours */
             hours: components["schemas"]["DecisionHour"][];
+            /** Actuals */
+            actuals: components["schemas"]["ActualPoint"][];
         };
-        /** DecisionHour */
+        /** DaySummary */
+        DaySummary: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Mae */
+            mae: number;
+        };
+        /**
+         * DecisionHour
+         * @description One hour: the forecast available at the cutoff, what actually happened, and the miss.
+         */
         DecisionHour: {
             /**
              * Start Time
@@ -165,6 +244,13 @@ export interface components {
             error_mw: number;
             /** Stale */
             stale: boolean;
+        };
+        /** ErrorDistribution */
+        ErrorDistribution: {
+            /** Bins */
+            bins: components["schemas"]["HistogramBin"][];
+            /** Shortfall */
+            shortfall: components["schemas"]["ShortfallPoint"][];
         };
         /**
          * ErrorSummary
@@ -222,6 +308,15 @@ export interface components {
             /** Forecast Rows */
             forecast_rows: number;
         };
+        /** HistogramBin */
+        HistogramBin: {
+            /** From Mw */
+            from_mw: number;
+            /** To Mw */
+            to_mw: number;
+            /** Count */
+            count: number;
+        };
         /** HorizonBucket */
         HorizonBucket: {
             /** From H */
@@ -239,6 +334,16 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+        };
+        /**
+         * ShortfallPoint
+         * @description Planning for `margin_mw` less wind than forecast, the share of hours still short.
+         */
+        ShortfallPoint: {
+            /** Margin Mw */
+            margin_mw: number;
+            /** Share Short */
+            share_short: number;
         };
         /** Token */
         Token: {
@@ -362,10 +467,10 @@ export interface operations {
             };
         };
     };
-    decision_forecasts_api_v1_decision_forecasts_get: {
+    accuracy_summary_api_v1_accuracy_summary_get: {
         parameters: {
             query?: {
-                /** @description UK local time on the day before delivery (auction deadline) */
+                /** @description Market (UK) local time on the day before delivery: the auction deadline */
                 cutoff?: string;
             };
             header?: never;
@@ -380,7 +485,105 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DecisionForecasts"];
+                    "application/json": components["schemas"]["ErrorSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accuracy_distribution_api_v1_accuracy_distribution_get: {
+        parameters: {
+            query?: {
+                /** @description Market (UK) local time on the day before delivery: the auction deadline */
+                cutoff?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDistribution"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    days_api_v1_days_get: {
+        parameters: {
+            query?: {
+                /** @description Market (UK) local time on the day before delivery: the auction deadline */
+                cutoff?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DaySummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    day_detail_api_v1_days__day__get: {
+        parameters: {
+            query?: {
+                /** @description Market (UK) local time on the day before delivery: the auction deadline */
+                cutoff?: string;
+            };
+            header?: never;
+            path: {
+                day: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DayDetail"];
                 };
             };
             /** @description Validation Error */
