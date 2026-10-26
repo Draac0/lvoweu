@@ -3,16 +3,20 @@
 import logging
 import time as clock
 from contextlib import asynccontextmanager
-from datetime import datetime, time
+from datetime import date, datetime, time
 from typing import Annotated
 
+import pandas as pd
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 
 from app import analysis, auth
 from app.data import Datasets, load_datasets
 from app.schemas import (
     ActualPoint,
-    DecisionForecasts,
+    DayDetail,
+    DaySummary,
+    ErrorDistribution,
+    ErrorSummary,
     ForecastHistory,
     Health,
     HorizonBucket,
@@ -55,23 +59,59 @@ def actuals(
     return df.to_dict("records")
 
 
-@router.get("/decision-forecasts")
-def decision_forecasts(
-    data: Data,
-    cutoff: Annotated[
-        time, Query(description="UK local time on the day before delivery (auction deadline)")
-    ] = time(9, 0),
-) -> DecisionForecasts:
-    """For every hour, the forecast available at the cutoff, its actual, and the error."""
+Cutoff = Annotated[
+    time,
+    Query(description="Market (UK) local time on the day before delivery: the auction deadline"),
+]
+DEFAULT_CUTOFF = time(9, 0)
+
+
+def _decision_hours(data: Datasets, cutoff: time) -> pd.DataFrame:
+    """Every hour's forecast available at the cutoff, joined to its actual."""
     chosen = analysis.decision_forecasts(data.forecasts, cutoff)
     matched = analysis.with_actuals(chosen, data.actuals)
     if matched.empty:
         raise HTTPException(404, "No forecasts were published before this cutoff")
-    hours = matched.rename(columns={"generation_mw": "forecast_mw"})
-    return DecisionForecasts(
-        cutoff=cutoff,
-        summary=analysis.summarize(matched["error_mw"]),
+    return matched.rename(columns={"generation_mw": "forecast_mw"})
+
+
+@router.get("/accuracy/summary")
+def accuracy_summary(data: Data, cutoff: Cutoff = DEFAULT_CUTOFF) -> ErrorSummary:
+    """Headline accuracy of the forecasts available at the cutoff, over all hours."""
+    return ErrorSummary(**analysis.summarize(_decision_hours(data, cutoff)["error_mw"]))
+
+
+@router.get("/accuracy/distribution")
+def accuracy_distribution(data: Data, cutoff: Cutoff = DEFAULT_CUTOFF) -> ErrorDistribution:
+    """Histogram of errors, and the share of hours still short for each safety margin."""
+    errors = _decision_hours(data, cutoff)["error_mw"]
+    return ErrorDistribution(
+        bins=analysis.error_histogram(errors).to_dict("records"),
+        shortfall=analysis.shortfall_curve(errors).to_dict("records"),
+    )
+
+
+@router.get("/days")
+def days(data: Data, cutoff: Cutoff = DEFAULT_CUTOFF) -> list[DaySummary]:
+    """Every delivery day with its typical miss (mean absolute error)."""
+    return analysis.mae_by_day(_decision_hours(data, cutoff)).to_dict("records")
+
+
+@router.get("/days/{day}")
+def day_detail(data: Data, day: date, cutoff: Cutoff = DEFAULT_CUTOFF) -> DayDetail:
+    """One market (UK) day: each hour's forecast at the cutoff vs actual, and all actuals."""
+    start, end = analysis.market_day_bounds(day)
+    hours = _decision_hours(data, cutoff)
+    hours = hours[(hours["start_time"] >= start) & (hours["start_time"] < end)]
+    if hours.empty:
+        raise HTTPException(404, f"No data for {day}")
+    actuals = data.actuals
+    actuals = actuals[(actuals["start_time"] >= start) & (actuals["start_time"] < end)]
+    return DayDetail(
+        date=day,
+        mae=round(float(hours["error_mw"].abs().mean()), 1),
         hours=hours.to_dict("records"),
+        actuals=actuals.to_dict("records"),
     )
 
 

@@ -60,9 +60,30 @@ def test_actuals_can_be_filtered_by_time(client):
     assert rows == [{"start_time": "2026-01-15T18:30:00Z", "generation_mw": 7593.0}]
 
 
-def test_decision_forecasts_default_cutoff(client):
-    body = client.get("/api/v1/decision-forecasts").json()
-    assert body["cutoff"] == "09:00:00"
+def test_summary_uses_forecast_available_at_default_cutoff(client):
+    # 07:30 forecast (8962) vs actual 7672: too high by 1290 MW.
+    body = client.get("/api/v1/accuracy/summary").json()
+    assert (body["count"], body["mae"], body["bias"]) == (1, 1290.0, 1290.0)
+
+
+def test_later_cutoff_uses_later_forecast(client):
+    # At 11:00 the 09:30 forecast (9053) is usable: too high by 1381 MW.
+    body = client.get("/api/v1/accuracy/summary", params={"cutoff": "11:00"}).json()
+    assert body["mae"] == 1381.0
+
+
+def test_invalid_cutoff_is_rejected(client):
+    assert client.get("/api/v1/accuracy/summary", params={"cutoff": "25:00"}).status_code == 422
+
+
+def test_days_lists_each_day_with_its_typical_miss(client):
+    assert client.get("/api/v1/days").json() == [{"date": "2026-01-15", "mae": 1290.0}]
+
+
+def test_day_detail(client):
+    body = client.get("/api/v1/days/2026-01-15").json()
+    assert body["date"] == "2026-01-15"
+    assert body["mae"] == 1290.0
     assert body["hours"] == [
         {
             "start_time": TARGET,
@@ -74,16 +95,19 @@ def test_decision_forecasts_default_cutoff(client):
             "stale": False,
         }
     ]
-    assert body["summary"]["mae"] == 1290.0
+    assert [a["start_time"] for a in body["actuals"]] == [TARGET, "2026-01-15T18:30:00Z"]
 
 
-def test_decision_forecasts_custom_cutoff(client):
-    body = client.get("/api/v1/decision-forecasts", params={"cutoff": "11:00"}).json()
-    assert body["hours"][0]["publish_time"] == "2026-01-14T09:30:00Z"
+def test_day_without_data_is_404(client):
+    assert client.get("/api/v1/days/2026-01-16").status_code == 404
 
 
-def test_invalid_cutoff_is_rejected(client):
-    assert client.get("/api/v1/decision-forecasts", params={"cutoff": "25:00"}).status_code == 422
+def test_distribution_has_histogram_and_shortfall_curve(client):
+    body = client.get("/api/v1/accuracy/distribution").json()
+    assert body["bins"] == [{"from_mw": 1000.0, "to_mw": 2000.0, "count": 1}]
+    # The one error is 1290 MW: short until the margin reaches 1300 MW.
+    shortfall = {p["margin_mw"]: p["share_short"] for p in body["shortfall"]}
+    assert (shortfall[1200.0], shortfall[1300.0]) == (1.0, 0.0)
 
 
 def test_forecast_history_lists_every_publish_for_one_hour(client):
@@ -115,13 +139,13 @@ class TestAuth:
         assert anonymous.post("/api/v1/auth/login", json=credentials).status_code == 200
 
     def test_data_requires_login(self, anonymous):
-        response = anonymous.get("/api/v1/decision-forecasts")
+        response = anonymous.get("/api/v1/accuracy/summary")
         assert response.status_code == 401
         assert response.json()["detail"] == "Not logged in"
 
     def test_tampered_token_is_rejected(self, client):
         client.headers["Authorization"] += "x"
-        assert client.get("/api/v1/decision-forecasts").json()["detail"] == "Invalid token"
+        assert client.get("/api/v1/accuracy/summary").json()["detail"] == "Invalid token"
 
     def test_expired_token_is_rejected(self, anonymous):
         expired = jwt.encode(
@@ -130,6 +154,6 @@ class TestAuth:
             algorithm=auth.ALGORITHM,
         )
         response = anonymous.get(
-            "/api/v1/decision-forecasts", headers={"Authorization": f"Bearer {expired}"}
+            "/api/v1/accuracy/summary", headers={"Authorization": f"Bearer {expired}"}
         )
         assert response.json()["detail"] == "Session expired, please log in again"

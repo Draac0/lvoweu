@@ -1,23 +1,36 @@
 """Which forecast was usable at decision time, and how wrong forecasts were."""
 
-from datetime import time
+from datetime import date, time
 
 import numpy as np
 import pandas as pd
 
-UK = "Europe/London"
+from app.config import MARKET_TIMEZONE
 
 # Elexon publishes at most 4 hours apart, so an older forecast means a publish was skipped.
 STALE_AFTER_H = 4
 
 
+def market_day(start_time: pd.Series) -> pd.Series:
+    """The market (UK) calendar day each UTC time falls on, as naive midnight timestamps."""
+    return start_time.dt.tz_convert(MARKET_TIMEZONE).dt.tz_localize(None).dt.normalize()
+
+
+def market_day_bounds(day: date) -> tuple[pd.Timestamp, pd.Timestamp]:
+    """UTC [start, end) of a market calendar day. In UK summer (BST): 23:00 to 23:00 UTC."""
+    midnight = pd.Timestamp(day)
+    start = midnight.tz_localize(MARKET_TIMEZONE).tz_convert("UTC")
+    end = (midnight + pd.Timedelta(days=1)).tz_localize(MARKET_TIMEZONE).tz_convert("UTC")
+    return start, end
+
+
 def decision_cutoff(start_time: pd.Series, cutoff: time) -> pd.Series:
-    """Cutoff (UTC) for each target hour: `cutoff` UK local time on the day before delivery."""
-    delivery_day = start_time.dt.tz_convert(UK).dt.tz_localize(None).dt.normalize()
+    """Cutoff (UTC) for each target hour: `cutoff` market local time on the day before delivery."""
+    delivery_day = market_day(start_time)
     local = (
         delivery_day - pd.Timedelta(days=1) + pd.Timedelta(hours=cutoff.hour, minutes=cutoff.minute)
     )
-    return local.dt.tz_localize(UK).dt.tz_convert("UTC")
+    return local.dt.tz_localize(MARKET_TIMEZONE).dt.tz_convert("UTC")
 
 
 def decision_forecasts(forecasts: pd.DataFrame, cutoff: time = time(9, 0)) -> pd.DataFrame:
@@ -66,3 +79,31 @@ def mae_by_horizon(matched: pd.DataFrame, edges: list[float]) -> pd.DataFrame:
     out["from_h"] = [b.left for b in out["horizon_h"]]
     out["to_h"] = [b.right for b in out["horizon_h"]]
     return out[["from_h", "to_h", "mae", "count"]]
+
+
+def mae_by_day(matched: pd.DataFrame) -> pd.DataFrame:
+    """Mean absolute error per market delivery day: columns date, mae."""
+    day = market_day(matched["start_time"]).dt.date.rename("date")
+    out = matched["error_mw"].abs().groupby(day).mean().round(1).rename("mae")
+    return out.reset_index()
+
+
+def error_histogram(errors: pd.Series, width_mw: float = 1000) -> pd.DataFrame:
+    """Count of errors per `width_mw` bucket: columns from_mw, to_mw, count."""
+    low = np.floor(errors.min() / width_mw) * width_mw
+    high = (np.floor(errors.max() / width_mw) + 1) * width_mw
+    counts, edges = np.histogram(errors, bins=np.arange(low, high + width_mw / 2, width_mw))
+    return pd.DataFrame({"from_mw": edges[:-1], "to_mw": edges[1:], "count": counts})
+
+
+def shortfall_curve(errors: pd.Series, step_mw: float = 100) -> pd.DataFrame:
+    """For each safety margin, the share of hours still short: columns margin_mw, share_short.
+
+    Planning for `margin` MW less wind than forecast leaves you short whenever the
+    forecast was too high by more than that (error > margin).
+    """
+    top = max(errors.max(), 0)
+    margins = np.arange(0, top + step_mw, step_mw)
+    values = errors.to_numpy()
+    shares = [(values > m).mean() for m in margins]
+    return pd.DataFrame({"margin_mw": margins, "share_short": np.round(shares, 4)})

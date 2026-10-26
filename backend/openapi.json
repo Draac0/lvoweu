@@ -138,11 +138,11 @@
         }
       }
     },
-    "/api/v1/decision-forecasts": {
+    "/api/v1/accuracy/summary": {
       "get": {
-        "summary": "Decision Forecasts",
-        "description": "For every hour, the forecast available at the cutoff, its actual, and the error.",
-        "operationId": "decision_forecasts_api_v1_decision_forecasts_get",
+        "summary": "Accuracy Summary",
+        "description": "Headline accuracy of the forecasts available at the cutoff, over all hours.",
+        "operationId": "accuracy_summary_api_v1_accuracy_summary_get",
         "security": [
           {
             "HTTPBearer": []
@@ -156,11 +156,11 @@
             "schema": {
               "type": "string",
               "format": "time",
-              "description": "UK local time on the day before delivery (auction deadline)",
+              "description": "Market (UK) local time on the day before delivery: the auction deadline",
               "default": "09:00:00",
               "title": "Cutoff"
             },
-            "description": "UK local time on the day before delivery (auction deadline)"
+            "description": "Market (UK) local time on the day before delivery: the auction deadline"
           }
         ],
         "responses": {
@@ -169,7 +169,168 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DecisionForecasts"
+                  "$ref": "#/components/schemas/ErrorSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accuracy/distribution": {
+      "get": {
+        "summary": "Accuracy Distribution",
+        "description": "Histogram of errors, and the share of hours still short for each safety margin.",
+        "operationId": "accuracy_distribution_api_v1_accuracy_distribution_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cutoff",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "time",
+              "description": "Market (UK) local time on the day before delivery: the auction deadline",
+              "default": "09:00:00",
+              "title": "Cutoff"
+            },
+            "description": "Market (UK) local time on the day before delivery: the auction deadline"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDistribution"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/days": {
+      "get": {
+        "summary": "Days",
+        "description": "Every delivery day with its typical miss (mean absolute error).",
+        "operationId": "days_api_v1_days_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cutoff",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "time",
+              "description": "Market (UK) local time on the day before delivery: the auction deadline",
+              "default": "09:00:00",
+              "title": "Cutoff"
+            },
+            "description": "Market (UK) local time on the day before delivery: the auction deadline"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DaySummary"
+                  },
+                  "title": "Response Days Api V1 Days Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/days/{day}": {
+      "get": {
+        "summary": "Day Detail",
+        "description": "One market (UK) day: each hour's forecast at the cutoff vs actual, and all actuals.",
+        "operationId": "day_detail_api_v1_days__day__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "day",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Day"
+            }
+          },
+          {
+            "name": "cutoff",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "time",
+              "description": "Market (UK) local time on the day before delivery: the auction deadline",
+              "default": "09:00:00",
+              "title": "Cutoff"
+            },
+            "description": "Market (UK) local time on the day before delivery: the auction deadline"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DayDetail"
                 }
               }
             }
@@ -283,15 +444,16 @@
         ],
         "title": "ActualPoint"
       },
-      "DecisionForecasts": {
+      "DayDetail": {
         "properties": {
-          "cutoff": {
+          "date": {
             "type": "string",
-            "format": "time",
-            "title": "Cutoff"
+            "format": "date",
+            "title": "Date"
           },
-          "summary": {
-            "$ref": "#/components/schemas/ErrorSummary"
+          "mae": {
+            "type": "number",
+            "title": "Mae"
           },
           "hours": {
             "items": {
@@ -299,15 +461,43 @@
             },
             "type": "array",
             "title": "Hours"
+          },
+          "actuals": {
+            "items": {
+              "$ref": "#/components/schemas/ActualPoint"
+            },
+            "type": "array",
+            "title": "Actuals"
           }
         },
         "type": "object",
         "required": [
-          "cutoff",
-          "summary",
-          "hours"
+          "date",
+          "mae",
+          "hours",
+          "actuals"
         ],
-        "title": "DecisionForecasts"
+        "title": "DayDetail",
+        "description": "One market (UK) delivery day: hourly forecasts vs actuals, plus half-hourly actuals."
+      },
+      "DaySummary": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "mae": {
+            "type": "number",
+            "title": "Mae"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "mae"
+        ],
+        "title": "DaySummary"
       },
       "DecisionHour": {
         "properties": {
@@ -352,7 +542,32 @@
           "error_mw",
           "stale"
         ],
-        "title": "DecisionHour"
+        "title": "DecisionHour",
+        "description": "One hour: the forecast available at the cutoff, what actually happened, and the miss."
+      },
+      "ErrorDistribution": {
+        "properties": {
+          "bins": {
+            "items": {
+              "$ref": "#/components/schemas/HistogramBin"
+            },
+            "type": "array",
+            "title": "Bins"
+          },
+          "shortfall": {
+            "items": {
+              "$ref": "#/components/schemas/ShortfallPoint"
+            },
+            "type": "array",
+            "title": "Shortfall"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bins",
+          "shortfall"
+        ],
+        "title": "ErrorDistribution"
       },
       "ErrorSummary": {
         "properties": {
@@ -487,6 +702,29 @@
         ],
         "title": "Health"
       },
+      "HistogramBin": {
+        "properties": {
+          "from_mw": {
+            "type": "number",
+            "title": "From Mw"
+          },
+          "to_mw": {
+            "type": "number",
+            "title": "To Mw"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "from_mw",
+          "to_mw",
+          "count"
+        ],
+        "title": "HistogramBin"
+      },
       "HorizonBucket": {
         "properties": {
           "from_h": {
@@ -532,6 +770,25 @@
           "password"
         ],
         "title": "LoginRequest"
+      },
+      "ShortfallPoint": {
+        "properties": {
+          "margin_mw": {
+            "type": "number",
+            "title": "Margin Mw"
+          },
+          "share_short": {
+            "type": "number",
+            "title": "Share Short"
+          }
+        },
+        "type": "object",
+        "required": [
+          "margin_mw",
+          "share_short"
+        ],
+        "title": "ShortfallPoint",
+        "description": "Planning for `margin_mw` less wind than forecast, the share of hours still short."
       },
       "Token": {
         "properties": {

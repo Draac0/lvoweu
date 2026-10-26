@@ -1,6 +1,6 @@
 """Response shapes for the API. Power values are MW, times are UTC."""
 
-from datetime import datetime, time
+from datetime import date, datetime
 
 from pydantic import BaseModel
 
@@ -39,6 +39,8 @@ class ErrorSummary(BaseModel):
 
 
 class DecisionHour(BaseModel):
+    """One hour: the forecast available at the cutoff, what actually happened, and the miss."""
+
     start_time: datetime
     publish_time: datetime
     horizon_h: float
@@ -48,10 +50,36 @@ class DecisionHour(BaseModel):
     stale: bool
 
 
-class DecisionForecasts(BaseModel):
-    cutoff: time
-    summary: ErrorSummary
+class DaySummary(BaseModel):
+    date: date
+    mae: float
+
+
+class DayDetail(BaseModel):
+    """One market (UK) delivery day: hourly forecasts vs actuals, plus half-hourly actuals."""
+
+    date: date
+    mae: float
     hours: list[DecisionHour]
+    actuals: list[ActualPoint]
+
+
+class HistogramBin(BaseModel):
+    from_mw: float
+    to_mw: float
+    count: int
+
+
+class ShortfallPoint(BaseModel):
+    """Planning for `margin_mw` less wind than forecast, the share of hours still short."""
+
+    margin_mw: float
+    share_short: float
+
+
+class ErrorDistribution(BaseModel):
+    bins: list[HistogramBin]
+    shortfall: list[ShortfallPoint]
 
 
 class ForecastPoint(BaseModel):

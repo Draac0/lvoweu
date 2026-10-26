@@ -1,8 +1,17 @@
-from datetime import time
+from datetime import date, time
 
 import pandas as pd
 
-from app.analysis import decision_forecasts, mae_by_horizon, summarize, with_actuals
+from app.analysis import (
+    decision_forecasts,
+    error_histogram,
+    mae_by_day,
+    mae_by_horizon,
+    market_day_bounds,
+    shortfall_curve,
+    summarize,
+    with_actuals,
+)
 
 
 def ts(s):
@@ -85,4 +94,57 @@ def test_mae_by_horizon_buckets():
     assert out.to_dict("records") == [
         {"from_h": 0, "to_h": 6, "mae": 200.0, "count": 2},
         {"from_h": 6, "to_h": 24, "mae": 1000.0, "count": 1},
+    ]
+
+
+def test_market_day_bounds_winter_is_midnight_utc():
+    assert market_day_bounds(date(2026, 1, 15)) == (
+        ts("2026-01-15T00:00Z"),
+        ts("2026-01-16T00:00Z"),
+    )
+
+
+def test_market_day_bounds_summer_starts_at_2300_utc():
+    # UK midnight in July is 23:00 UTC the evening before (BST = UTC+1).
+    assert market_day_bounds(date(2026, 7, 15)) == (
+        ts("2026-07-14T23:00Z"),
+        ts("2026-07-15T23:00Z"),
+    )
+
+
+def test_mae_by_day_groups_by_market_day():
+    matched = pd.DataFrame(
+        {
+            "start_time": [
+                ts("2026-01-15T10:00Z"),
+                ts("2026-01-15T11:00Z"),
+                ts("2026-01-16T10:00Z"),
+            ],
+            "error_mw": [100.0, -300.0, 50.0],
+        }
+    )
+    assert mae_by_day(matched).to_dict("records") == [
+        {"date": date(2026, 1, 15), "mae": 200.0},
+        {"date": date(2026, 1, 16), "mae": 50.0},
+    ]
+
+
+def test_error_histogram_counts_per_bucket():
+    out = error_histogram(pd.Series([-1500.0, 200.0, 900.0, 1000.0]), width_mw=1000)
+    assert out.to_dict("records") == [
+        {"from_mw": -2000.0, "to_mw": -1000.0, "count": 1},
+        {"from_mw": -1000.0, "to_mw": 0.0, "count": 0},
+        {"from_mw": 0.0, "to_mw": 1000.0, "count": 2},
+        {"from_mw": 1000.0, "to_mw": 2000.0, "count": 1},
+    ]
+
+
+def test_shortfall_curve_shrinks_as_margin_grows():
+    # Forecast too high by 50, 150 and 250 MW in three hours; too low in one.
+    curve = shortfall_curve(pd.Series([-100.0, 50.0, 150.0, 250.0]), step_mw=100)
+    assert curve.to_dict("records") == [
+        {"margin_mw": 0.0, "share_short": 0.75},  # no margin: short in 3 of 4 hours
+        {"margin_mw": 100.0, "share_short": 0.5},
+        {"margin_mw": 200.0, "share_short": 0.25},
+        {"margin_mw": 300.0, "share_short": 0.0},  # covers the worst hour
     ]

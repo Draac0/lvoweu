@@ -6,6 +6,9 @@ from pathlib import Path
 
 ELEXON_BASE_URL = "https://data.elexon.co.uk/bmrs/api/v1"
 
+# The GB market's clock: auction deadlines and delivery days are UK local time (GMT/BST).
+MARKET_TIMEZONE = "Europe/London"
+
 # Delivery days covered by the analysis (inclusive).
 DELIVERY_START = date(2026, 1, 1)
 DELIVERY_END = date(2026, 1, 31)

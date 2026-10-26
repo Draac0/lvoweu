@@ -127,9 +127,16 @@ All data endpoints require a login. There is one demo user, hard-coded to showca
 |---|---|
 | `POST /api/v1/auth/login` | Token for the demo user |
 | `GET /api/v1/health` | Status and loaded row counts (public) |
-| `GET /api/v1/actuals?start=&end=` | Half-hourly actual wind generation |
-| `GET /api/v1/decision-forecasts?cutoff=09:00` | Per hour: the forecast available at the cutoff (UK time, day before delivery), the actual, the error; plus summary stats |
-| `GET /api/v1/forecasts?start_time=` | Every forecast published for one target hour |
+| `GET /api/v1/accuracy/summary?cutoff=09:00` | MAE, bias and P10/P50/P90 of the forecasts available at the cutoff |
+| `GET /api/v1/accuracy/distribution?cutoff=` | Error histogram, and the share of hours still short for each safety margin |
 | `GET /api/v1/accuracy/by-horizon` | Mean absolute error grouped by forecast lead time |
+| `GET /api/v1/days?cutoff=` | Each delivery day with its typical miss |
+| `GET /api/v1/days/{date}?cutoff=` | One UK day: each hour's forecast vs actual and error, plus half-hourly actuals |
+| `GET /api/v1/forecasts?start_time=` | Every forecast published for one target hour |
+| `GET /api/v1/actuals?start=&end=` | Raw half-hourly actual wind generation |
+
+All times in the API are UTC. Delivery days and the `cutoff` are in **GB market time** (UK local, GMT/BST), because that is how the day-ahead auction and settlement days are defined; it is one setting, `MARKET_TIMEZONE` in `backend/app/config.py`.
+
+`cutoff` is market local time on the day before delivery (the auction deadline); the decision forecast for each hour is the latest one published at or before it. The server does all filtering and aggregation; responses contain only what the UI displays.
 
 _More sections (frontend, Docker, deployment, assumptions, AI usage) are added as the project is built._
